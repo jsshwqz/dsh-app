@@ -2,14 +2,14 @@ import { app, BrowserWindow, Menu, ipcMain, Tray, nativeImage, dialog } from 'el
 import path from 'node:path'
 import { registerIPC } from './ipc.js'
 import { RuntimeManager } from './runtime.js'
-import { createSettingsStore } from './settings.js'
+import { createSettingsStore, type Settings } from './settings.js'
 
 const isDev = !app.isPackaged
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let runtime: RuntimeManager | null = null
-let settings: { [k: string]: unknown } = {}
+let settings: Settings = {} as Settings
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -66,11 +66,11 @@ async function quit(): Promise<void> {
 
 app.whenReady().then(async () => {
   settings = createSettingsStore().load()
-  runtime = new RuntimeManager(settings as any)
+  runtime = new RuntimeManager({ cwd: settings.workspace, provider: settings.provider, model: settings.model, maxTokens: settings.maxTokens, apiKey: settings.apiKey, sessionRoot: settings.sessionRoot })
   await runtime.start().catch(() => {})
   const win = createWindow()
   tray = createTray(win)
-  registerIPC(mainWindow!, runtime, settings as any)
+  registerIPC(mainWindow!, runtime, settings)
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     {
       label: 'DSH Desktop',

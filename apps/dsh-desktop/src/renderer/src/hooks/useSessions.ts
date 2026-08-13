@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { generateId, formatTitle } from './lib/utils.js'
+import { generateId, formatTitle } from '../lib/utils.js'
 import type { Session } from './lib/types.js'
 
 const STORAGE_KEY = 'dsh-sessions-v1'

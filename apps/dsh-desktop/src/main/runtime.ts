@@ -1,9 +1,10 @@
+
+
 import { spawn, ChildProcess } from 'node:child_process'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import fs from 'node:fs'
 import { DeepSeekHarness } from '@deepseek-ai/dsh-sdk-client'
-import type { SessionEvent } from '@deepseek-ai/dsh-session'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -26,7 +27,7 @@ export interface RuntimeStatus {
 export interface PromptOptions {
   sessionId: string
   content: string
-  onEvent?: (event: SessionEvent) => void
+  onEvent?: (event: { type: string; [key: string]: any }) => void
 }
 
 export interface SessionInfo {
@@ -44,7 +45,7 @@ export class RuntimeManager {
   private harness: DeepSeekHarness | null = null
   private status: RuntimeStatus = { connected: false, error: null, provider: '', model: '' }
   private listeners: ((status: RuntimeStatus) => void)[] = []
-  private eventListeners: ((sessionId: string, event: SessionEvent) => void)[] = []
+  private eventListeners: ((sessionId: string, event: { type: string; [key: string]: any }) => void)[] = []
   private readonly config: RuntimeConfig
 
   constructor(config: RuntimeConfig) {
@@ -56,7 +57,7 @@ export class RuntimeManager {
     return () => { this.listeners = this.listeners.filter((l) => l !== fn) }
   }
 
-  onEvent(fn: (sessionId: string, event: SessionEvent) => void): () => void {
+  onEvent(fn: (sessionId: string, event: { type: string; [key: string]: any }) => void): () => void {
     this.eventListeners.push(fn)
     return () => { this.eventListeners = this.eventListeners.filter((l) => l !== fn) }
   }
@@ -90,7 +91,7 @@ export class RuntimeManager {
     this.listeners.forEach((l) => l(this.status))
   }
 
-  private notifyEvent(sessionId: string, event: SessionEvent): void {
+  private notifyEvent(sessionId: string, event: { type: string; [key: string]: any }): void {
     this.eventListeners.forEach((l) => l(sessionId, event))
   }
 
@@ -145,7 +146,7 @@ export class RuntimeManager {
     const result = await session.run(content, {
       onNotification: (notification) => {
         if (notification.method === 'session.event' && notification.params.event) {
-          this.notifyEvent(sessionId, notification.params.event as SessionEvent)
+          this.notifyEvent(sessionId, notification.params.event as { type: string; [key: string]: any })
         }
       },
     })
@@ -158,7 +159,7 @@ export class RuntimeManager {
     const result = await session.run(content, {
       onNotification: (notification) => {
         if (notification.method === 'session.event' && notification.params.event) {
-          this.notifyEvent(sessionId, notification.params.event as SessionEvent)
+          this.notifyEvent(sessionId, notification.params.event as { type: string; [key: string]: any })
         }
         if (notification.method === 'session.status') {
           this.notify()
