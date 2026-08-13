@@ -59,20 +59,20 @@ function SelectionQuotePopup({ quote, onQuote }: { quote: SelectionQuote | null;
 
 export default function App() {
   const { sessions, activeSession, createSession, switchSession, renameSession, deleteSession } = useSessions()
-  const { status, response, isLoading, prompt, messages } = useRuntime()
+  const { status, isLoading, prompt, messages } = useRuntime()
   const [showSettings, setShowSettings] = useState(false)
   const [sidebarVisible, setSidebarVisible] = useState(true)
   const [refs, setRefs] = useState<RefChip[]>([])
   const chatEndRef = useRef<HTMLDivElement>(null)
 
-  const handleNewSession = useCallback(() => {
-    const s = createSession()
-    switchSession(s.id)
+  const handleNewSession = useCallback(async () => {
+    const s = await createSession()
+    if (s) await switchSession(s.id)
   }, [createSession, switchSession])
 
-  const handlePrompt = useCallback((content: string) => {
+  const handlePrompt = useCallback(async (content: string) => {
     if (!activeSession || !content.trim()) return
-    prompt(activeSession.id, content.trim())
+    await prompt(activeSession.id, content.trim())
     setRefs([])
   }, [activeSession, prompt])
 
@@ -85,7 +85,7 @@ export default function App() {
   }, [])
 
   const handleFeedback = useCallback((_msgId: string, _kind: string) => {}, [])
-  const handleRerun = useCallback((msgId: string) => { if (!activeSession) return; prompt(activeSession.id, '/rerun ' + msgId) }, [activeSession, prompt])
+  const handleRerun = useCallback(async (msgId: string) => { if (!activeSession) return; await prompt(activeSession.id, '/rerun ' + msgId) }, [activeSession, prompt])
   const handleFileAttach = useCallback((_files: File[]) => {}, [])
 
   const quote = useSelectionQuote(handleQuote)

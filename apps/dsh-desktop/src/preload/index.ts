@@ -1,104 +1,78 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
-interface IPCHandlers {
-  // Runtime
-  'runtime:status': () => Promise<{ connected: boolean; error: string | null; provider: string; model: string }>
-  'runtime:restart': () => Promise<void>
-  'runtime:prompt': (args: { sessionId: string; content: string }) => Promise<{ response: string }>
-  'runtime:promptText': (args: { sessionId: string; content: string }) => Promise<{ response: string }>
-  // Settings
-  'settings:get': () => Promise<Record<string, unknown>>
-  'settings:update': (args: Record<string, unknown>) => Promise<Record<string, unknown>>
-  'settings:path': () => Promise<string>
-  // Dialogs
-  'dialog:openWorkspace': () => Promise<string | null>
-  'dialog:openFile': () => Promise<string | null>
-  // Utilities
-  'shell:openPath': (path: string) => Promise<boolean>
-  'workspace:path': () => Promise<string>
-  'app:version': () => Promise<string>
-  'app:platform': () => Promise<string>
-}
+type AppEvent = () => void
+type StatusListener = (s: unknown) => void
+type EventListener = (sid: string, e: unknown) => void
 
-const api: {
+interface IPCHandlers {} // type-safety is best-effort here
+
+contextBridge.exposeInMainWorld('dsDesktop', {
   runtime: {
-    status: () => Promise<{ connected: boolean; error: string | null; provider: string; model: string }>
-    restart: () => Promise<void>
-    prompt: (sessionId: string, content: string) => Promise<{ response: string }>
-    promptText: (sessionId: string, content: string) => Promise<{ response: string }>
-    onStatus: (fn: (s: { connected: boolean; error: string | null; provider: string; model: string }) => void) => () => void
-    onEvent: (fn: (sessionId: string, event: unknown) => void) => () => void
-  }
-  settings: {
-    get: () => Promise<Record<string, unknown>>
-    update: (s: Record<string, unknown>) => Promise<Record<string, unknown>>
-    path: () => Promise<string>
-  }
-  dialog: {
-    openWorkspace: () => Promise<string | null>
-    openFile: () => Promise<string | null>
-  }
-  shell: {
-    openPath: (p: string) => Promise<boolean>
-  }
-  app: {
-    getVersion: () => Promise<string>
-    getPlatform: () => Promise<string>
-    getPath: () => Promise<string>
-    onNewSession: (fn: () => void) => () => void
-    onToggleSidebar: (fn: () => void) => () => void
-    onOpenSettings: (fn: () => void) => () => void
-  }
-} = {
-  runtime: {
-    status: () => ipcRenderer.invoke('runtime:status'),
+    getStatus: () => ipcRenderer.invoke('runtime:status'),
+    prompt: (sessionId: string, content: string) => ipcRenderer.invoke('runtime:prompt', sessionId, content),
     restart: () => ipcRenderer.invoke('runtime:restart'),
-    prompt: (sessionId, content) => ipcRenderer.invoke('runtime:prompt', { sessionId, content }),
-    promptText: (sessionId, content) => ipcRenderer.invoke('runtime:promptText', { sessionId, content }),
-    onStatus: (fn) => {
-      const handler = (_event, status) => fn(status)
-      ipcRenderer.on('runtime:status', handler)
-      return () => ipcRenderer.off('runtime:status', handler)
+    onStatus: (fn: StatusListener) => {
+      const h = (_e: any, s: unknown) => fn(s)
+      ipcRenderer.on('runtime:status', h)
+      return () => ipcRenderer.off('runtime:status', h)
     },
-    onEvent: (fn) => {
-      const handler = (_event, sessionId, event) => fn(sessionId, event)
-      ipcRenderer.on('runtime:event', handler)
-      return () => ipcRenderer.off('runtime:event', handler)
+    onEvent: (fn: EventListener) => {
+      const h = (_e: any, data: { sessionId: string; event: unknown }) => fn(data.sessionId, data.event)
+      ipcRenderer.on('runtime:event', h)
+      return () => ipcRenderer.off('runtime:event', h)
     },
   },
+
   settings: {
     get: () => ipcRenderer.invoke('settings:get'),
-    update: (s) => ipcRenderer.invoke('settings:update', s),
-    path: () => ipcRenderer.invoke('settings:path'),
+    update: (p: Record<string, unknown>) => ipcRenderer.invoke('settings:update', p),
   },
+
+  sessions: {
+    list: () => ipcRenderer.invoke('session:list'),
+    active: () => ipcRenderer.invoke('session:active'),
+    search: (q: string) => ipcRenderer.invoke('session:search', q),
+    messages: (id: string) => ipcRenderer.invoke('session:messages', id),
+    create: (model?: string) => ipcRenderer.invoke('session:create', model),
+    switch: (id: string) => ipcRenderer.invoke('session:switch', id),
+    rename: (id: string, title: string) => ipcRenderer.invoke('session:rename', { id, title }),
+    delete: (id: string) => ipcRenderer.invoke('session:delete', id),
+    export: (id: string, format: 'md' | 'txt' | 'json') => ipcRenderer.invoke('session:export', { id, format }),
+    refresh: () => ipcRenderer.invoke('session:refresh'),
+  },
+
   dialog: {
     openWorkspace: () => ipcRenderer.invoke('dialog:openWorkspace'),
     openFile: () => ipcRenderer.invoke('dialog:openFile'),
+    saveFile: (opts: { defaultPath: string; filters: Array<{ name: string; extensions: string[] }> }) =>
+      ipcRenderer.invoke('dialog:saveFile', opts),
   },
+
   shell: {
-    openPath: (p) => ipcRenderer.invoke('shell:openPath', p),
+    openPath: (p: string) => ipcRenderer.invoke('shell:openPath', p),
+    openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
+    writeFile: ({ path, content }: { path: string; content: string }) => ipcRenderer.invoke('shell:writeFile', { path, content }),
   },
+
   app: {
     getVersion: () => ipcRenderer.invoke('app:version'),
     getPlatform: () => ipcRenderer.invoke('app:platform'),
-    getPath: () => ipcRenderer.invoke('workspace:path'),
-    onNewSession: (fn) => {
-      const handler = () => fn()
-      ipcRenderer.on('new-session', handler)
-      return () => ipcRenderer.off('new-session', handler)
+    checkUpdate: () => ipcRenderer.invoke('app:checkUpdate'),
+    onNewSession: (fn: AppEvent) => {
+      const h = () => fn()
+      ipcRenderer.on('new-session', h)
+      return () => ipcRenderer.off('new-session', h)
     },
-    onToggleSidebar: (fn) => {
-      const handler = () => fn()
-      ipcRenderer.on('toggle-sidebar', handler)
-      return () => ipcRenderer.off('toggle-sidebar', handler)
+    onToggleSidebar: (fn: AppEvent) => {
+      const h = () => fn()
+      ipcRenderer.on('toggle-sidebar', h)
+      return () => ipcRenderer.off('toggle-sidebar', h)
     },
-    onOpenSettings: (fn) => {
-      const handler = () => fn()
-      ipcRenderer.on('open-settings', handler)
-      return () => ipcRenderer.off('open-settings', handler)
+    onOpenSettings: (fn: AppEvent) => {
+      const h = () => fn()
+      ipcRenderer.on('open-settings', h)
+      return () => ipcRenderer.off('open-settings', h)
     },
+    trayQuickPrompt: (content: string) => ipcRenderer.send('tray:quickPrompt', content),
   },
-}
-
-contextBridge.exposeInMainWorld('dsDesktop', api)
-export type { IPCHandlers }
+})
