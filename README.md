@@ -1,64 +1,62 @@
-# DSH Desktop
+# DSH App
 
-Multi-platform desktop client for DeepSeek Harness. Built with Electron + React.
+Multi-platform desktop client for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).
 
-## Architecture
+Built with Electron + React + Vite.
 
-  Electron Main Process manages a long-lived dsh-jsonrpc-agent subprocess.
-  Renderer is a React/Vite app loaded in the Electron BrowserWindow.
-  IPC bridge (preload) exposes runtime, settings, dialog, shell APIs.
+## Install
+
+Download from [Releases](https://github.com/jsshwqz/dsh-app/releases):
+
+- Windows: .exe installer or portable
+- macOS: .dmg
+- Linux: AppImage, .deb, .rpm
+
+## Setup
+
+1. Open the app
+2. Go to Settings (Cmd+, / Ctrl+,)
+3. Enter your DeepSeek API Key
+4. Select model and workspace
+5. Start chatting!
+
+## Features
+
+- Multi-platform: macOS / Windows / Linux
+- Dark theme with tech-forward minimalist design
+- Message actions: copy, like/dislike, regenerate
+- Code blocks with language labels and copy button
+- Image preview with modal zoom
+- Scroll-to-bottom floating button
+- Drag-and-drop file upload
+- Text selection quoting (select → Quote → ref-chips)
+- Keyboard shortcuts: Cmd/Ctrl+N, Cmd+B, Cmd+,
+
+## Sync with official
+
+The core code lives in [jsshwqz/deepseek-harness](https://github.com/jsshwqz/deepseek-harness) (fork of official).
+This repo only contains the desktop app layer.
+
+## Build
+
+From the fork repo:
+
+```bash
+pnpm install
+pnpm run build:lib:host
+cd apps/dsh-desktop
+pnpm install
+pnpm run build
+pnpm run pack:all
+```
 
 ## Tech Stack
 
-- Framework: Electron 33
-- Frontend: React 18 + Vite 6 + TypeScript 6
-- State: Zustand + localStorage for sessions
-- Build: tsc for main process, vite build for renderer
-- Packaging: electron-builder (NSIS/portable on Win, DMG on macOS, AppImage/deb on Linux)
+- Electron 33
+- React 18 + Vite 6
+- TypeScript 6
+- electron-builder (cross-platform packaging)
 
-## Design
+## License
 
-- Dark theme (#0a0e14 base) — tech-forward, minimal
-- Typography: Inter for UI, JetBrains Mono for code
-- Accent: Indigo (#6366f1) with cyan (#22d3ee) highlights
-- Layout: 3-pane (sidebar | chat | settings) with sticky header/statusbar
-- Animations: fade-in messages, pulse typing indicator, smooth scroll
-- Keyboard shortcuts: Cmd/Ctrl+N new session, Cmd/Ctrl+B sidebar toggle, Cmd/Ctrl+, settings
-
-## Getting Started
-
-  # Install dependencies
-  pnpm install
-
-  # Build main + renderer
-  pnpm run build
-
-  # Run in dev mode
-  pnpm run dev
-
-## Packaging
-
-  # Windows
-  pnpm run pack:win
-
-  # macOS
-  pnpm run pack:mac
-
-  # Linux
-  pnpm run pack:linux
-
-  # All platforms
-  pnpm run pack:all
-
-## File Structure
-
-  apps/dsh-desktop/
-  ├── src/
-  │   ├── main/          Electron main process
-  │   ├── preload/       Secure IPC bridge
-  │   └── renderer/      React + Vite frontend
-  ├── runtime/
-  │   └── cordis.yml     Bundled runtime config
-  ├── electron-builder.config.cjs
-  ├── vite.config.ts
-  └── package.json
+MIT
