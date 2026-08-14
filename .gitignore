@@ -1,0 +1,18 @@
+# Rust/Tauri
+target/
+Cargo.lock
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Release builds (optional, uncomment if you want to distribute binaries)
+# src-tauri/target/release/*.exe
