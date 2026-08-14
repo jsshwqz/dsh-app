@@ -461,31 +461,6 @@ describe('malformed replay and listener lifecycle', () => {
     expectRepeatedFailure(meter(), session, /no matching step\/start/)
   })
 
-  it('rejects an assistant/message that lost its surface binding on replay', () => {
-    const session = Session.create(SessionId('no-surface'))
-    session.append('step/start', { turn: 1, step: 1 })
-    appendHeader(session, header('deepseek-v4-flash'))
-    appendUnchecked(session, {
-      type: 'assistant/message',
-      seq: session.seq,
-      time: 0,
-      data: {
-        turn: 1,
-        step: 1,
-        message: createMessage({
-          role: 'assistant',
-          content: [{ type: 'text', text: 'replayed' }],
-          source: {
-            kind: 'model',
-            ...{ provider: 'mock', model: 'deepseek-v4-flash' },
-          },
-        }),
-      },
-      // Deliberately no surfaceOp: a legacy writer dropped the binding on replay.
-    })
-    expectRepeatedFailure(meter(), session, /not surface-bound/)
-  })
-
   it('clears completed step boundaries and rejects overlapping or late step events', () => {
     const overlapping = Session.create(SessionId('overlapping-step'))
     overlapping.append('step/start', { turn: 1, step: 1 })

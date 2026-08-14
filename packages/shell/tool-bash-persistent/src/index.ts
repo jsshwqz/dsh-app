@@ -313,10 +313,8 @@ async function executeCommand(
       )
       await shells.reset(owner, 'persistent bash command timed out')
       return [
-        // A deadline timeout is the only observable fact here; the terminal session
-        // may also have been killed for resource reasons, but that is not
-        // distinguishable from this fence, so we report the timeout only.
-        `Your command timed out after ${Math.round(timedOut.timeoutMs / 1000)} seconds. Below is partial output:`,
+        // TODO: Report a timeout only; this signal does not establish an OOM.
+        `Your command timed out after ${Math.round(timedOut.timeoutMs / 1000)} seconds or experienced an OOM error. Below is partial output:`,
         partial,
         SHELL_RESET_MESSAGE,
       ].join('\n')

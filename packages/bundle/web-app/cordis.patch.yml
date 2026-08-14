@@ -183,9 +183,6 @@
     - id: ui-sidebar
       name: '@deepseek-ai/dsh-client-ui-sidebar'
 
-    - id: ui-selection-quote
-      name: '@deepseek-ai/dsh-client-ui-selection-quote'
-
     - id: ui-settings
       name: '@deepseek-ai/dsh-client-ui-settings'
 

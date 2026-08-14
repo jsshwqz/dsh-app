@@ -1,0 +1,39 @@
+{
+  "name": "@deepseek-ai/dsh-desktop",
+  "description": "Multi-platform desktop client for DeepSeek Harness",
+  "version": "0.1.0-rc.5",
+  "private": true,
+  "type": "module",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run build:main && npm run build:renderer",
+    "build:main": "tsc -p tsconfig.main.json",
+    "build:renderer": "vite build",
+    "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.renderer.json --noEmit",
+    "pack:win": "electron-builder --win --config electron-builder.config.cjs",
+    "pack:mac": "electron-builder --mac --config electron-builder.config.cjs",
+    "pack:linux": "electron-builder --linux --config electron-builder.config.cjs",
+    "pack:all": "electron-builder --win --mac --linux --config electron-builder.config.cjs",
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "~18.3.1",
+    "@types/react-dom": "~18.3.0",
+    "@vitejs/plugin-react": "^4.0.0",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.0",
+    "typescript": "^6.0.3",
+    "vite": "^6.0.0"
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh-sdk-client": "workspace:^",
+    "@deepseek-ai/dsh-sdk-protocol": "workspace:^",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-markdown": "^9.0.1",
+    "remark-gfm": "^4.0.0",
+    "zustand": "^4.5.0"
+  }
+}

@@ -709,13 +709,8 @@ export interface ChatViewInjected {
 
 /** Full chat-view component props: runtime & its Tool/command/tail render shares & store & injected & locale seat. */
 export type ChatViewSlotProps =
-  PropsRuntime<'conversation.view'> & PropsRenderSlots<'conversation.chat.node' | 'conversation.view.overlay'>
+  PropsRuntime<'conversation.view'> & PropsRenderSlots<'conversation.chat.node'>
   & PropsStore<ChatStore> & ChatViewInjected & PropsLocale<'conversation'>
-// 'conversation.view.overlay' is owned by ui-selection-quote (dependency direction:
-// that plugin imports ui-conversation; this package never imports the plugin),
-// so its SlotMap entry lives in the plugin's declare-module merge. The runtime
-// children declaration (apply.ts) and this widen stay here alongside the other
-// chat-view holes.
 
 /**
  * Injected share of the details slot: the panel is otherwise a pure reader of
