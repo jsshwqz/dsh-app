@@ -16,6 +16,7 @@ struct AppContext {
     child: TMutex<Option<Child>>,
     pending: Arc<Mutex<HashMap<String, tokio::sync::oneshot::Sender<serde_json::Value>>>>,
     status: Arc<Mutex<RuntimeStatus>>,
+    system_prompt: Arc<Mutex<Option<String>>>,
 }
 
 #[derive(Deserialize)]
@@ -24,6 +25,8 @@ struct InitParams {
     #[serde(default)] max_tokens: Option<u64>,
     #[serde(default)] api_key: Option<String>,
     #[serde(default)] runtime_path: Option<String>,
+    #[serde(default)] system_prompt: Option<String>,
+    #[serde(default)] first_prompt_sent: bool,
 }
 #[derive(Deserialize)]
 struct PromptParams { session_id: String, #[serde(default)] content: Option<String>, #[serde(default)] content_blocks: Option<Vec<serde_json::Value>> }
@@ -113,14 +116,23 @@ async fn init_runtime(state: tauri::State<'_, AppContext>, app: tauri::AppHandle
     let mut st = state.status.lock().unwrap();
     st.connected = true; st.error = None;
     st.provider = params.provider.clone(); st.model = params.model.clone();
+    { let mut sp = state.system_prompt.lock().unwrap(); *sp = params.system_prompt; }
     Ok(st.clone())
 }
 #[tauri::command]
 async fn send_prompt(state: tauri::State<'_, AppContext>, params: PromptParams) -> Result<PromptResult, String> {
+    let sp = state.system_prompt.lock().unwrap().clone();
+    let first_prompt_sent = params.content_blocks.is_none() && sp.is_some();
     let cb: serde_json::Value = if let Some(blocks) = &params.content_blocks {
         serde_json::json!(blocks)
     } else {
-        serde_json::json!([{"type":"text","text":params.content.as_ref().map_or("",|s|s.as_str())}])
+        let user_text = params.content.as_ref().map_or("",|s|s.as_str());
+        if first_prompt_sent {
+            let merged = format!("[SYSTEM] {}[/SYSTEM] \n\n{}", sp.unwrap_or_default(), user_text);
+            serde_json::json!([{"type":"text","text":merged}])
+        } else {
+            serde_json::json!([{"type":"text","text":user_text.to_string()}])
+        }
     };
     let p = serde_json::json!({"sessionId":params.session_id,"contentBlocks":cb});
     let resp = rpc_req(&state.stdin, &state.pending, "session/prompt", p).await?;
@@ -177,6 +189,7 @@ pub fn run() {
             stdin: TMutex::new(None), child: TMutex::new(None),
             pending: Arc::new(Mutex::new(HashMap::new())),
             status: Arc::new(Mutex::new(RuntimeStatus::default())),
+            system_prompt: Arc::new(Mutex::new(None)),
         })
         .setup(|app| { let _ = app.handle().emit("runtime:ready", ""); Ok(()) })
         .invoke_handler(tauri::generate_handler![init_runtime, send_prompt, get_status, shutdown_runtime, read_file, list_files])
