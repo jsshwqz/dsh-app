@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>DSH Desktop (Tauri)</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -22,6 +22,24 @@ header h1{font-size:15px;font-weight:600}
 #inputbar{display:flex;gap:8px;padding:12px 18px;border-top:1px solid #1b2430;background:#0d1219}
 #inputbar textarea{flex:1;background:#0a0e14;border:1px solid #1b2430;border-radius:8px;padding:9px 11px;color:#e6edf3;font-size:13px;resize:none;outline:none;font-family:inherit;min-height:36px;max-height:120px}
 #inputbar textarea:focus{border-color:#4f8cff}
+
+#pluginbar{display:flex;gap:6px;padding:6px 18px 0;background:#0d1219}
+.plugin-btn{background:#161c26;border:1px solid #1b2430;color:#8b97a8;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px}
+.plugin-btn:hover{background:#1b2430;color:#e6edf3}
+.plugin-btn .ico{font-size:14px}
+.plugin-btn .lbl{opacity:0;transition:opacity .15s}
+.plugin-btn:hover .lbl{opacity:1}
+#wsOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;align-items:center;justify-content:center}
+#wsOverlay.on{display:flex}
+#wsDialog{background:#0d1219;border:1px solid #1b2430;border-radius:12px;padding:18px;width:420px;max-height:60vh;display:flex;flex-direction:column;gap:10px}
+#wsDialog h3{font-size:14px;font-weight:600}
+#wsList{flex:1;overflow-y:auto;border:1px solid #1b2430;border-radius:6px;max-height:340px}
+#wsList .row{padding:8px 12px;font-size:12px;cursor:pointer;display:flex;justify-content:space-between;gap:8px}
+#wsList .row:hover{background:#1b2430}
+#wsList .row .n{color:#e6edf3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#wsList .row .s{color:#5a6675;white-space:nowrap}
+#wsClose{background:transparent;border:none;color:#8b97a8;font-size:13px;cursor:pointer;align-self:flex-end}
+#wsEmpty{color:#5a6675;font-size:12px;padding:16px;text-align:center}
 </style></head><body><div id="app">
 <header><h1>DSH Desktop <span style="color:#5a6675;font-weight:400;font-size:12px">(Rust / Tauri)</span></h1>
 <div class="status"><span class="dot" id="dot"></span><span id="statusText">disconnected</span></div></header>
@@ -36,5 +54,10 @@ header h1{font-size:15px;font-weight:600}
 <div id="connErr" style="font-size:12px;color:#f87171;min-height:16px"></div>
 </div></div>
 <div id="chat"><div id="msgs"></div>
-<div id="inputbar"><textarea id="inp" placeholder="Type a message..." rows="1"></textarea><button class="btn" id="btnSend">Send</button><button class="btn ghost" id="btnDisc">Disconnect</button></div>
-</div></div><script src="app.js"></script></body></html>
+<div id="pluginbar">
+<button class="plugin-btn" id="btnImg" title="Attach image"><span class="ico">🖼️</span><span class="lbl">Image</span></button>
+<button class="plugin-btn" id="btnFile" title="Attach file"><span class="ico">📄</span><span class="lbl">File</span></button>
+<button class="plugin-btn" id="btnQuote" title="Quote workspace file"><span class="ico">📋</span><span class="lbl">Quote</span></button>
+</div><div id="inputbar"><textarea id="inp" placeholder="Type a message..." rows="1"></textarea><button class="btn" id="btnSend">Send</button><button class="btn ghost" id="btnDisc">Disconnect</button></div>
+</div><input type="file" id="fileImg" accept="image/*" style="display:none"><input type="file" id="fileDoc" style="display:none">
+<div id="wsOverlay"><div id="wsDialog"><div style="display:flex;justify-content:space-between;align-items:center"><h3>Workspace Files</h3><button id="wsClose">✕</button></div><div id="wsList"></div></div></div></div><script src="app.js"></script></body></html>

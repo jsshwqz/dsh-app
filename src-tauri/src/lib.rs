@@ -26,7 +26,7 @@ struct InitParams {
     #[serde(default)] runtime_path: Option<String>,
 }
 #[derive(Deserialize)]
-struct PromptParams { session_id: String, content: String }
+struct PromptParams { session_id: String, #[serde(default)] content: Option<String>, #[serde(default)] content_blocks: Option<Vec<serde_json::Value>> }
 #[derive(Serialize)]
 struct PromptResult { message_id: String }
 
@@ -117,7 +117,11 @@ async fn init_runtime(state: tauri::State<'_, AppContext>, app: tauri::AppHandle
 }
 #[tauri::command]
 async fn send_prompt(state: tauri::State<'_, AppContext>, params: PromptParams) -> Result<PromptResult, String> {
-    let cb = serde_json::json!([{"type":"text","text":params.content}]);
+    let cb: serde_json::Value = if let Some(blocks) = &params.content_blocks {
+        serde_json::json!(blocks)
+    } else {
+        serde_json::json!([{"type":"text","text":params.content.as_ref().map_or("",|s|s.as_str())}])
+    };
     let p = serde_json::json!({"sessionId":params.session_id,"contentBlocks":cb});
     let resp = rpc_req(&state.stdin, &state.pending, "session/prompt", p).await?;
     let msg_id = resp.get("result").and_then(|r| r.get("messageId")).and_then(|x| x.as_str()).unwrap_or("").to_string();
@@ -126,6 +130,35 @@ async fn send_prompt(state: tauri::State<'_, AppContext>, params: PromptParams) 
 
 #[tauri::command]
 async fn get_status(state: tauri::State<'_, AppContext>) -> Result<RuntimeStatus, String> { Ok(state.status.lock().unwrap().clone()) }
+
+
+#[tauri::command]
+async fn read_file(path: String, max_bytes: Option<usize>) -> Result<String, String> {
+    let mut data = std::fs::read(&path).map_err(|e| format!("read error: {}", e))?;
+    if let Some(m) = max_bytes { if data.len() > m { data.truncate(m); } }
+    let txt = String::from_utf8_lossy(&data).to_string();
+    Ok(txt)
+}
+
+#[tauri::command]
+async fn list_files(dir: String, max: Option<usize>) -> Result<Vec<serde_json::Value>, String> {
+    let mut out = Vec::new();
+    let entries = std::fs::read_dir(&dir).map_err(|e| format!("list error: {}", e))?;
+    let cap = max.unwrap_or(200);
+    for e in entries {
+        let e = e.map_err(|_| "read dir error".to_string())?;
+        let meta = e.metadata().map_err(|_| "meta error".to_string())?;
+        let path = e.path().to_string_lossy().to_string();
+        out.push(serde_json::json!({
+            "name": e.file_name().to_string_lossy().to_string(),
+            "path": path,
+            "size": meta.len(),
+            "is_file": meta.is_file(),
+        }));
+        if out.len() >= cap { break; }
+    }
+    Ok(out)
+}
 
 #[tauri::command]
 async fn shutdown_runtime(state: tauri::State<'_, AppContext>) -> Result<(), String> {
@@ -146,7 +179,7 @@ pub fn run() {
             status: Arc::new(Mutex::new(RuntimeStatus::default())),
         })
         .setup(|app| { let _ = app.handle().emit("runtime:ready", ""); Ok(()) })
-        .invoke_handler(tauri::generate_handler![init_runtime, send_prompt, get_status, shutdown_runtime])
+        .invoke_handler(tauri::generate_handler![init_runtime, send_prompt, get_status, shutdown_runtime, read_file, list_files])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
