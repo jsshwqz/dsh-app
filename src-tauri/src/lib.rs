@@ -8,6 +8,16 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin, Command};
 use uuid::Uuid;
 
+fn find_node() -> String {
+    if let Ok(p) = std::env::var("PATH") {
+        for d in p.split(';') {
+            let path = std::path::Path::new(d).join("node.exe");
+            if path.exists() { return path.to_string_lossy().to_string(); }
+        }
+    }
+    "node".to_string()
+}
+
 #[derive(Clone, Serialize, Default)]
 struct RuntimeStatus { connected: bool, error: Option<String>, provider: String, model: String }
 
@@ -33,7 +43,7 @@ struct PromptParams { session_id: String, #[serde(default)] content: Option<Stri
 #[derive(Serialize)]
 struct PromptResult { message_id: String }
 
-async fn rpc_req(stdin: &TMutex<Option<ChildStdin>>, pending: &Mutex<HashMap<String, tokio::sync::oneshot::Sender<serde_json::Value>>>, method: &str, params: serde_json::Value) -> Result<serde_json::Value, String> {
+async fn rpc_req(stdin: &TMutex<Option<ChildStdin>>, pending: &Mutex<HashMap<String, tokio::sync::oneshot::Sender<serde_json::Value>>>, method: &str, params: serde_json::Value, timeout_ms: u64) -> Result<serde_json::Value, String> {
     let id = Uuid::new_v4().to_string();
     let req = serde_json::json!({"jsonrpc":"2.0","id":id,"method":method,"params":params});
     let (tx, rx) = tokio::sync::oneshot::channel();
@@ -46,7 +56,10 @@ async fn rpc_req(stdin: &TMutex<Option<ChildStdin>>, pending: &Mutex<HashMap<Str
         w.write_all(&payload).await.map_err(|e| e.to_string())?;
         w.flush().await.map_err(|e| e.to_string())?;
     }
-    rx.await.map_err(|_| "request dropped".into())
+    tokio::time::timeout(tokio::time::Duration::from_millis(timeout_ms), rx)
+        .await
+        .map_err(|_| "request timeout".to_string())?
+        .map_err(|_| "request dropped".to_string())
 }
 #[tauri::command]
 async fn init_runtime(state: tauri::State<'_, AppContext>, app: tauri::AppHandle, params: InitParams) -> Result<RuntimeStatus, String> {
@@ -54,9 +67,11 @@ async fn init_runtime(state: tauri::State<'_, AppContext>, app: tauri::AppHandle
         let mut child = state.child.lock().await;
         if let Some(c) = child.as_mut() { let _ = c.kill().await; }
     }
-    let mut cmd = Command::new("node");
-    let mut args = vec!["--import".to_string(), "tsx/esm".to_string()];
-    args.push(params.runtime_path.as_ref().map_or_else(|| "../../packages/examples/jsonrpc-demo/src/bin.ts".to_string(), |p| p.clone()));
+    let mut cmd = Command::new(find_node());
+    let runtime = params.runtime_path.as_ref().map_or_else(|| "../../packages/examples/jsonrpc-demo/src/bin.ts".to_string(), |p| p.clone());
+    let mut args: Vec<String> = vec![];
+    if runtime.ends_with(".ts") { args.push("--import".to_string()); args.push("tsx/esm".to_string()); }
+    args.push(runtime);
     cmd.args(args);
     cmd.env("DSH_CWD", &params.cwd);
     if let Some(k) = &params.api_key { cmd.env("DEEPSEEK_API_KEY", k); }
@@ -111,7 +126,7 @@ async fn init_runtime(state: tauri::State<'_, AppContext>, app: tauri::AppHandle
     });
     let init_params = serde_json::json!({"cwd": params.cwd, "provider": params.provider, "model": params.model, "maxTokens": params.max_tokens});
     {
-        let _ = rpc_req(&state.stdin, &state.pending, "initialize", init_params).await;
+        let _ = rpc_req(&state.stdin, &state.pending, "initialize", init_params, 10000).await;
     }
     let mut st = state.status.lock().unwrap();
     st.connected = true; st.error = None;
@@ -135,7 +150,7 @@ async fn send_prompt(state: tauri::State<'_, AppContext>, params: PromptParams) 
         }
     };
     let p = serde_json::json!({"sessionId":params.session_id,"contentBlocks":cb});
-    let resp = rpc_req(&state.stdin, &state.pending, "session/prompt", p).await?;
+    let resp = rpc_req(&state.stdin, &state.pending, "session/prompt", p, 120000).await?;
     let msg_id = resp.get("result").and_then(|r| r.get("messageId")).and_then(|x| x.as_str()).unwrap_or("").to_string();
     Ok(PromptResult{message_id: msg_id})
 }
@@ -174,7 +189,7 @@ async fn list_files(dir: String, max: Option<usize>) -> Result<Vec<serde_json::V
 
 #[tauri::command]
 async fn shutdown_runtime(state: tauri::State<'_, AppContext>) -> Result<(), String> {
-    let _ = rpc_req(&state.stdin, &state.pending, "shutdown", serde_json::Value::Null).await;
+    let _ = rpc_req(&state.stdin, &state.pending, "shutdown", serde_json::Value::Null, 5000).await;
     { let mut child = state.child.lock().await; if let Some(c) = child.as_mut() { let _ = c.wait().await; } *child = None; }
     *state.stdin.lock().await = None;
     let mut st = state.status.lock().unwrap();
